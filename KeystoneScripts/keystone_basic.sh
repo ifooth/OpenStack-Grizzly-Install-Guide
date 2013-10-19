@@ -1,56 +1,39 @@
 #!/bin/sh
 #
 # Keystone basic configuration 
+# joe lei
 
-# Mainly inspired by https://github.com/openstack/keystone/blob/master/tools/sample_data.sh
+# drop keystone db
+mysql -uroot -proot -e "drop database if exists keystone;create database keystone;"
+keystone-manage db_sync
 
-# Modified by Bilel Msekni / Institut Telecom
-#
-# Support: openstack@lists.launchpad.net
-# License: Apache Software License (ASL) 2.0
-#
-HOST_IP=10.10.10.51
-ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin_pass}
-SERVICE_PASSWORD=${SERVICE_PASSWORD:-service_pass}
+HOST_IP=10.10.1.100
 export SERVICE_TOKEN="ADMIN"
 export SERVICE_ENDPOINT="http://${HOST_IP}:35357/v2.0"
-SERVICE_TENANT_NAME=${SERVICE_TENANT_NAME:-service}
 
-get_id () {
-    echo `$@ | awk '/ id / { print $4 }'`
-}
+ADMIN=admin
+SERVICE=service
+ADMIN_PASSWORD=-admin_pass
+SERVICE_PASSWORD=service_pass
 
 # Tenants
-ADMIN_TENANT=$(get_id keystone tenant-create --name=admin)
-SERVICE_TENANT=$(get_id keystone tenant-create --name=$SERVICE_TENANT_NAME)
-
-
-# Users
-ADMIN_USER=$(get_id keystone user-create --name=admin --pass="$ADMIN_PASSWORD" --email=admin@domain.com)
-
+keystone tenant-create --name=$ADMIN
+keystone tenant-create --name=$SERVICE
 
 # Roles
-ADMIN_ROLE=$(get_id keystone role-create --name=admin)
-KEYSTONEADMIN_ROLE=$(get_id keystone role-create --name=KeystoneAdmin)
-KEYSTONESERVICE_ROLE=$(get_id keystone role-create --name=KeystoneServiceAdmin)
+keystone role-create --name=$ADMIN
+keystone role-create --name=$SERVICE
 
-# Add Roles to Users in Tenants
-keystone user-role-add --user-id $ADMIN_USER --role-id $ADMIN_ROLE --tenant-id $ADMIN_TENANT
-keystone user-role-add --user-id $ADMIN_USER --role-id $KEYSTONEADMIN_ROLE --tenant-id $ADMIN_TENANT
-keystone user-role-add --user-id $ADMIN_USER --role-id $KEYSTONESERVICE_ROLE --tenant-id $ADMIN_TENANT
-
-# The Member role is used by Horizon and Swift
-MEMBER_ROLE=$(get_id keystone role-create --name=Member)
-
-# Configure service users/roles
-NOVA_USER=$(get_id keystone user-create --name=nova --pass="$SERVICE_PASSWORD" --tenant-id $SERVICE_TENANT --email=nova@domain.com)
-keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $NOVA_USER --role-id $ADMIN_ROLE
-
-GLANCE_USER=$(get_id keystone user-create --name=glance --pass="$SERVICE_PASSWORD" --tenant-id $SERVICE_TENANT --email=glance@domain.com)
-keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $GLANCE_USER --role-id $ADMIN_ROLE
-
-QUANTUM_USER=$(get_id keystone user-create --name=quantum --pass="$SERVICE_PASSWORD" --tenant-id $SERVICE_TENANT --email=quantum@domain.com)
-keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $QUANTUM_USER --role-id $ADMIN_ROLE
-
-CINDER_USER=$(get_id keystone user-create --name=cinder --pass="$SERVICE_PASSWORD" --tenant-id $SERVICE_TENANT --email=cinder@domain.com)
-keystone user-role-add --tenant-id $SERVICE_TENANT --user-id $CINDER_USER --role-id $ADMIN_ROLE
+# Users
+# admin
+keystone user-create --name=admin --pass="$ADMIN_PASSWORD" --email=admin@domain.com
+keystone user-role-add --user $ADMIN --role $ADMIN --tenant $ADMIN
+# nova
+keystone user-create --name=nova --pass="$SERVICE_PASSWORD" --tenant-id $SERVICE --email=nova@domain.com
+keystone user-role-add --user nova --role $SERVICE --tenant $SERVICE
+# glance
+keystone user-create --name=glance --pass="$SERVICE_PASSWORD" --tenant-id $SERVICE --email=glance@domain.com
+keystone user-role-add --user glance --role $SERVICE --tenant $SERVICE
+# neutron
+keystone user-create --name=neutron --pass="$SERVICE_PASSWORD" --tenant-id $SERVICE --email=neutron@domain.com
+keystone user-role-add --user neutron --role $SERVICE --tenant $SERVICE
